@@ -9,7 +9,8 @@ import Paper from "@material-ui/core/Paper";
 import Spinner from "../../Spinner";
 import Error from "../../Error";
 import Eye from "../../../../assets/img/eye.svg";
-import axios from "axios";
+import api from "../../../../helpers/api";
+import { filterWithStatus } from "../../../../helpers";
 
 const fields = [
   "Id",
@@ -35,10 +36,10 @@ const PoolTable = () => {
   const fetchCommitment = async () => {
     setStatus({ loader: true });
     try {
-      const response = await axios.get(
-        "https://my-json-server.typicode.com/Megajjks/dbAshokaTest/commitments"
-      );
-      setCommitments(response.data);
+      const response = await api.get("/commitments");
+      //filter commitments with status
+      let query = ["prevalidado", "validando", "correcion"];
+      setCommitments(filterWithStatus(response.data, query));
       setStatus({
         loader: false,
         isError: false,
@@ -73,7 +74,7 @@ const PoolTable = () => {
       const payload = searchString.toLowerCase();
       const id = item.id.toLowerCase();
       const organization = item.organization.toLowerCase();
-      const agent = `${item.first_name.toLowerCase()}  ${item.last_name.toLowerCase()}`;
+      const agent = `${item.firstName.toLowerCase()}  ${item.lastName.toLowerCase()}`;
       const city = item.city.toLowerCase();
       const status = item.status.toLowerCase();
       const sector = item.sector.toLowerCase();
@@ -120,7 +121,7 @@ const PoolTable = () => {
               <TableRow key={commitment.id}>
                 <TableCell align="center">{commitment.id}</TableCell>
                 <TableCell align="center">{commitment.organization}</TableCell>
-                <TableCell align="center">{`${commitment.first_name} ${commitment.last_name}`}</TableCell>
+                <TableCell align="center">{`${commitment.firstName} ${commitment.lastName}`}</TableCell>
                 <TableCell align="center">{commitment.city}</TableCell>
                 <TableCell align="center">{commitment.state}</TableCell>
                 <TableCell align="center">{commitment.sector}</TableCell>

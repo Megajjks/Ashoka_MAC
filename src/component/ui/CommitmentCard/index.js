@@ -12,6 +12,7 @@ import {
 import User from "../../../assets/img/usercard.svg";
 import Map from "../../../assets/img/mapcard.svg";
 import Btn from "../GeneralButton";
+import { dataStatus } from "../../../helpers/index";
 
 const status = {
   validando: {
@@ -52,6 +53,8 @@ const status = {
 };
 
 const CommitmentCard = ({ data, btnTitle, onClick }) => {
+  let brief = `${data.q1.slice(0, 200)}...`;
+  let infoStatus = dataStatus(data.status);
   return (
     <div style={{ display: "flex", justifyContent: "space-beetwen" }}>
       <Wrapper>
@@ -59,18 +62,15 @@ const CommitmentCard = ({ data, btnTitle, onClick }) => {
         <TxtPrimary> {data.organization} </TxtPrimary>
         <Badge style={{ alignSelf: "flex-start", padding: ".5rem 0" }}>
           <SvgImg src={User} />
-          <Txtlight> Juan perez </Txtlight>
+          <Txtlight> {`${data.firstName}  ${data.lastName}`} </Txtlight>
         </Badge>
-        <TxtSecundary> {data.brief} </TxtSecundary>
+        <TxtSecundary> {brief} </TxtSecundary>
         <Badge style={{ width: "100%", padding: ".5rem 0" }}>
           <Badge style={{ alignSelf: "flex-start", padding: ".5rem 0" }}>
             <SvgImg src={Map} />
-            <Txtlight> {data.location} </Txtlight>
+            <Txtlight> {data.city} </Txtlight>
           </Badge>
-          <Status status={status[data.status]}>
-            {" "}
-            {status[data.status].value}{" "}
-          </Status>
+          <Status status={infoStatus}> {infoStatus.value} </Status>
         </Badge>
         {btnTitle ? (
           <Btn title={btnTitle} type="secundary" onClick={onClick} />
