@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
 import CommitmentCardList from "../../../ui/CommitmentCardList";
 import Spinner from "../../../ui/Spinner";
-import Error from "../../../ui/Error";
+import Error from "../../../ui/alerts/Error";
+import WithoutData from "../../../ui/alerts/WithoutData";
 import { SearchBar } from "./styled";
 import api from "../../../../helpers/api";
-import { filterWithStatus } from "../../../../helpers";
+import { filterWithIdCollaboratorAndStatus } from "../../../../helpers";
 
 const Management = () => {
   const [commitments, setCommitments] = useState([]);
@@ -14,14 +15,18 @@ const Management = () => {
     isError: false,
     message: "",
   });
+  const token = JSON.parse(localStorage.getItem("login_data")).accessToken;
+  const userId = JSON.parse(localStorage.getItem("login_data")).userId;
 
   useEffect(() => {
     const fetchCommitments = async () => {
       setStatus({ loader: true });
       try {
-        const response = await api.get("/commitments?status=proceso");
+        const response = await api.get("/commitments", {
+          headers: { Authorization: token },
+        });
         setCommitments(
-          filterWithStatus(response.data, ["proceso", "cumplido"])
+          filterWithIdCollaboratorAndStatus(response.data, userId, ["proceso"])
         );
         setStatus({
           loader: false,
@@ -69,15 +74,29 @@ const Management = () => {
     setSearchString(value);
   };
 
-  return (
-    <div>
-      <h1>Compromisos asignados</h1>
-      <SearchBar value={searchString} onChange={search} />
+  const renderCommitments = () => {
+    if (commitments.length === 0 && !status.loader && !status.isError) {
+      return (
+        <WithoutData
+          title="¡Oh! aun no tienes compromisos asignados"
+          content="Espera a que un administrador te asigne un compromiso para empezar a trabajar 😉"
+        />
+      );
+    }
+    return (
       <CommitmentCardList
         commitments={commitments}
         btnTitle="Gestionar compromiso"
         btnUrlBase="/traicing_commitment"
       />
+    );
+  };
+
+  return (
+    <div>
+      <h1>Compromisos asignados</h1>
+      <SearchBar value={searchString} onChange={search} />
+      {renderCommitments()}
       {status.loader ? <Spinner /> : null}
       {status.isError ? <Error /> : null}
     </div>
