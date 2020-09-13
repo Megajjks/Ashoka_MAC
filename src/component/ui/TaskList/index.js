@@ -1,39 +1,49 @@
-import React, { useState } from "react";
+import React, { Fragment, useContext } from "react";
 import Task from "../Task";
-import api from "../../../helpers/api";
+import { CommitmentContext } from "../../context/CommitmentContext";
+import { actions } from "../../context/CommitmentContext/actions";
 
-const TaskList = () => {
-  const [tasks, setTasks] = useState([]);
+const TaskList = ({ tasks, isCollaborator }) => {
+  const { state, dispatch } = useContext(CommitmentContext);
 
-  const getCommitmentId = () => {
-    const URLactual = window.location;
-    const commitment = URLactual.pathname;
-    const res = commitment.split("/");
-    const id = res[2];
-    return id;
+  //function to change the status a task
+  const changeStatusTask = (id) => {
+    console.log(`estoy en la task ${id}`);
+    //request to change the status a task
   };
 
-  const getTasks = async () => {
-    /* const response = await api.get(`https://5f22f3000e9f660016d88abe.mockapi.io/api/v1/tasks?idCommitment=${getCommitmentId()}`);
-    setTasks(response.data); */
+  //function to deleted a task
+  const removeTask = (id) => {
+    console.log(`estoy eleminando la task ${id}`);
+    //request to remove a task
   };
 
-  getTasks();
+  //function to edit a task
+  const editTask = (task) => {
+    dispatch({
+      type: actions.showModalEditTask,
+      payload: { task: task, isShow: !state.showModalTask },
+    });
+  };
 
   return (
-    <>
-      {tasks.map((task) => (
+    <Fragment>
+      {tasks.map((task, idx) => (
         <Task
+          key={idx}
           title={task.title}
           description={task.description}
           status={task.status}
           priority={task.priority}
           date={task.date}
-          collaborator={task.collaborator}
-          role={task.role}
+          user={task.user}
+          isCollaborator={isCollaborator}
+          changeStatusTask={() => changeStatusTask(task.id)}
+          removeTask={() => removeTask(task.id)}
+          editTask={() => editTask(task)}
         ></Task>
       ))}
-    </>
+    </Fragment>
   );
 };
 
