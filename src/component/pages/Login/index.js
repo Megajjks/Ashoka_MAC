@@ -31,13 +31,7 @@ import { actions } from "./actions";
 const GenericLogin = () => {
   const history = useHistory();
   const [state, dispatch] = useReducer(reducer, initialState);
-  const [user, setUser] = useState({
-    email: "",
-    password: "",
-  });
   const [showPassword, setShowPassword] = useState(false);
-
-  const { email, password } = user;
 
   const submitData = async (e) => {
     e.preventDefault();
@@ -55,7 +49,7 @@ const GenericLogin = () => {
       };
       localStorage.clear();
       localStorage.setItem("login_data", JSON.stringify(loginData));
-      history.push("/dashboard");
+      history.push(`/panel/dashboard`);
     } catch (error) {
       //when the server response is different than a 200
       dispatch({
@@ -113,7 +107,11 @@ const GenericLogin = () => {
               ),
             }}
           />
-          <GeneralButton title="Login" />
+          <GeneralButton
+            title="Login"
+            type="primary-loader"
+            loader={state.loginLoading}
+          />
         </Form>
         <SignIn>
           ¿Aun no tienes una cuenta?,{" "}

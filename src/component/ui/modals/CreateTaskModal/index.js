@@ -1,85 +1,87 @@
-import React, { useState } from "react";
-import { useHistory } from "react-router-dom";
-import Button from "@material-ui/core/Button";
+import React, { useContext } from "react";
+import { CommitmentContext } from "../../../context/CommitmentContext";
+import { actions } from "../../../context/CommitmentContext/actions";
+
+import Button from "../../GeneralButton";
 import Dialog from "@material-ui/core/Dialog";
 import DialogActions from "@material-ui/core/DialogActions";
 import DialogContent from "@material-ui/core/DialogContent";
 import DialogTitle from "@material-ui/core/DialogTitle";
 import TextField from "@material-ui/core/TextField";
-import { ButtonCreateTask, useStyles } from "./styled";
-import api from "../../../../helpers/api"
+import { useStyles } from "./styled";
+import api from "../../../../helpers/api";
 
-const CreateTaskModal = ({ openNewTask, closeModalNewTask }) => {
+const CreateTaskModal = ({ openNewTask, closeModalNewTask, isEdit }) => {
+  const { state, dispatch } = useContext(CommitmentContext);
+  const id = JSON.parse(localStorage.getItem("login_data")).userId;
   const classes = useStyles();
-  const [task, setTask] = useState({
-    title: "",
-    description: "",
-    date: "",
-  });
-  const [error, setError] = useState(false);
 
-  const updateState = (e) => {
-    setTask({
-      ...task,
-      [e.target.name]: e.target.value,
-    });
+  const handleupdateTask = (field, value) => {
+    dispatch({ type: actions.updateFieldAddTask, payload: { field, value } });
   };
 
-  const { title, description, date } = task;
-
-  const getCommitmentId = () => {
-    const URLactual = window.location;
-    const commitment = URLactual.pathname;
-    const res = commitment.split("/");
-    const id = res[2];
-    return id;
-  }
-
-  const submitTask = (e) => {
+  const addTask = (e) => {
     e.preventDefault();
-    if (title.trim() === "" || description.trim() === "" || date === "") {
-      setError(true);
+    if (
+      state.newTask.title.trim() === "" ||
+      state.newTask.description.trim() === "" ||
+      state.newTask.date === ""
+    ) {
+      dispatch({
+        type: actions.addTaskError,
+        payload: "¡Ops!, no tan rapido, has olvidado rellenar unos campos",
+      });
       return;
     }
-    setError(false);
-    setTask({
-      ...task,
-      "idCommitment": getCommitmentId()
-    })
     try {
+      dispatch({ type: actions.addTask });
       const fetchTask = async () => {
         const response = await api.post("/tasks", {
-          title: title,
-          description: description,
+          title: state.newTask.title,
+          description: state.newTask.description,
           status: true,
           priority: "low",
-          date: date
-        })
-      }
-      fetchTask()
-    } catch(e) {
-      console.log(e)
+          date: state.newTask.date,
+          collaboratorId: id,
+        });
+        dispatch({ type: actions.addTaskSuccess, payload: !state.reload });
+      };
+      fetchTask();
+    } catch (e) {
+      dispatch({ type: actions.addTaskError, payload: "Ocurrió un error" });
     }
-    setTask({
-      title: "",
-      description: "",
-      date: "",
-    });
+  };
+
+  //save data after edit the task
+  const saveTask = () => {
+    console.log("guardando la tarea");
+    //request to save change of task
+  };
+
+  //close task and clean data when modal is edit Task
+  const closeModalEditTask = () => {
+    dispatch({ type: actions.closeModalEditTask, payload: false });
+  };
+
+  const dataFormat = (dates) => {
+    const date = new Date(dates);
+    console.log(dates);
+    return date;
   };
 
   return (
     <>
       <Dialog
         open={openNewTask}
-        onClose={closeModalNewTask}
+        onClose={isEdit ? closeModalEditTask : closeModalNewTask}
         aria-labelledby="alert-dialog-title"
         aria-describedby="alert-dialog-description"
       >
-        <DialogTitle id="alert-dialog-title" style={{ textAlign: "center" }}>
+        <DialogTitle id="alert-dialog-title" style={{ textAlign: "left" }}>
           {"Crear Tarea"}
         </DialogTitle>
         <DialogContent>
-          <form onSubmit={submitTask}>
+          <form>
             <TextField
               type="text"
               label="Título"
@@ -87,42 +89,51 @@ const CreateTaskModal = ({ openNewTask, closeModalNewTask }) => {
               fullWidth
               margin="dense"
               name="title"
-              onChange={updateState}
-              value={title}
+              onChange={(e) => handleupdateTask(e.target.name, e.target.value)}
+              value={state.newTask.title}
             />
             <TextField
               type="text"
               label="Descripción"
+              multiline
+              rowsMax={10}
               color="secondary"
               style={{ marginTop: "10px" }}
               fullWidth
               margin="dense"
               name="description"
-              onChange={updateState}
-              value={description}
+              onChange={(e) => handleupdateTask(e.target.name, e.target.value)}
+              value={state.newTask.description}
             />
             <TextField
               id="date"
-              label="Birthday"
+              label="Fecha"
               type="date"
               color="secondary"
               defaultValue="aaaa-mm-dd"
               name="date"
-              onChange={updateState}
-              value={date}
+              onChange={(e) => handleupdateTask(e.target.name, e.target.value)}
+              value={state.newTask.date}
               className={classes.textField}
               InputLabelProps={{
                 shrink: true,
               }}
               style={{ marginLeft: "0", marginTop: "20px" }}
             />
-            <ButtonCreateTask type="submit">Agregar Tarea</ButtonCreateTask>
           </form>
         </DialogContent>
         <DialogActions>
-          <Button onClick={closeModalNewTask} color="secondary">
-            Cerrar
-          </Button>
+          <Button
+            title="Cerrar"
+            onClick={isEdit ? closeModalEditTask : closeModalNewTask}
+            type="secundary"
+            size="30%"
+          />
+          {isEdit ? (
+            <Button title="Guardar Tarea" onClick={saveTask} size="40%" />
+          ) : (
+            <Button title="Agregar Tarea" onClick={addTask} size="40%" />
+          )}
         </DialogActions>
       </Dialog>
     </>

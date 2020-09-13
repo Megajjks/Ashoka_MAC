@@ -1,11 +1,19 @@
-import React, { useState, Fragment, useEffect } from "react";
+import React, { useState, Fragment, useEffect, useContext } from "react";
+import { CommitmentContext } from "../../context/CommitmentContext";
+import { actions } from "../../context/CommitmentContext/actions";
 import { useHistory } from "react-router-dom";
 import Button from "../GeneralButton";
 import TaskList from "../TaskList";
 import CollaboratorCardList from "../CollaboratorCardList";
 import Spinner from "../Spinner";
 import Error from "../alerts/Error";
-import { dataStatus, filterWithRol } from "../../../helpers";
+import WithoutTasks from "../alerts/WithoutTasks";
+import {
+  dataStatus,
+  filterWithRol,
+  rolName,
+  matchUser,
+} from "../../../helpers";
 
 import Autocomplete from "@material-ui/lab/Autocomplete";
 import TextField from "@material-ui/core/TextField";
@@ -30,154 +38,201 @@ import {
 } from "./styled";
 import api from "../../../helpers/api";
 
-const TracingCommitmentDetails = ({ rol }) => {
+const TracingCommitmentDetails = (props) => {
+  const { state, dispatch } = useContext(CommitmentContext);
   const history = useHistory();
-  const [commitment, setCommitment] = useState({ collaborators: [] });
-  const [status, setStatus] = useState({
-    spinner: false,
-    error: false,
-    message: "",
-  });
-  const [addColaborator, setAddColaborator] = useState(false);
-  const [dropdownStatus, setDropdownStatus] = useState(null);
-  const [listCollaborator, setListCollaborator] = useState([]);
-  const [likelyCollaborator, setLikelyCollaborator] = useState([]);
-  const token = JSON.parse(localStorage.getItem("login_data")).accessToken;
+  const [openCreateTask, setOpenCreateTask] = useState(false);
 
   //HTTP REQUEST FUNCTION
 
   //get commitment and data to show
   useEffect(() => {
     const getCommitment = async () => {
-      setStatus({ ...status, spinner: true });
+      dispatch({ type: actions.getCommitment });
       try {
         const url = `/commitments/${history.location.state}`;
-        const response = await api.get(url, {
-          headers: { Authorization: token },
-        });
-        setCommitment(response.data);
-        setStatus({ ...status, spinner: false, error: false });
+        const { data } = await api.get(url);
+        dispatch({ type: actions.getCommitmentSuccess, payload: data });
       } catch (e) {
-        setStatus({ ...status, spinner: false, error: true, message: { e } });
-        console.log(e);
+        dispatch({
+          type: actions.getCommitmentError,
+          payload: "Ocurrió un error en la petición",
+        });
+      }
+    };
+
+    const getListCollaborator = async () => {
+      dispatch({ type: actions.getCollaboratorsList });
+      try {
+        const url = `/users`;
+        const { data } = await api.get(url);
+        dispatch({
+          type: actions.getCollaboratorsListSuccess,
+          payload: filterWithRol(data, ["1", "2"]),
+        });
+      } catch (e) {
+        dispatch({
+          type: actions.getCollaboratorsListError,
+          payload: "Ocurrio un error",
+        });
       }
     };
     getCommitment();
-  }, [commitment.status]);
+    getListCollaborator();
+  }, [state.reload]);
 
-  //get list of all collaborator and Admins
+  //get tasks
   useEffect(() => {
-    const getListCollaborator = async () => {
+    const getTasks = async () => {
+      dispatch({ type: actions.getTasksList });
       try {
-        const url = `/users`;
-        const response = await api.get(url, {
-          headers: { Authorization: token },
+        const { data } = await api.get("/tasks");
+        dispatch({ type: actions.getTasksListSuccess, payload: data });
+      } catch {
+        dispatch({
+          type: actions.getTasksListError,
+          payload:
+            "ha ocurrido un problema al buscar las tareas de seguimiento. Verifica si tienes conexión a internet y vuelve a intentar",
         });
-        setListCollaborator(filterWithRol(response.data, ["1", "2"]));
-      } catch (e) {
-        console.log(e);
       }
     };
-    getListCollaborator();
-  }, []);
+    getTasks();
+  }, [state.reload, state.reloadTasks]);
 
   //post to add colaborador in commitment
   const addCollaborator = () => {
     //function to add colaborator
     const postColaborator = async (id) => {
-      let data = { userId: id, commitmentId: commitment.id };
+      let data = { userId: id, commitmentId: state.commitment.id };
       try {
-        const response = await api.post("/collaborators/add", data, {
-          headers: { Authorization: token },
-        });
+        const response = await api.post("/collaborators/add", data);
       } catch (e) {
         console.log(e);
       }
     };
     //if list is avoid
-    if (likelyCollaborator.length === 0) {
-      console.log("entre");
+    if (state.likelyCollaborator.length === 0) {
+      handleWrapperAddColaborator();
       return;
     }
     //adding collaborator one by one
     Promise.all(
-      likelyCollaborator.map(
+      state.likelyCollaborator.map(
         async (collaborator) => await postColaborator(collaborator.id)
       )
-    );
-    setAddColaborator(false);
+    )
+      .then(() =>
+        dispatch({
+          type: actions.saveColaborators,
+          payload: !state.reload,
+        })
+      )
+      .catch(() =>
+        dispatch({
+          type: actions.errorColaborators,
+          payload: "Ocurrio un error",
+        })
+      );
   };
 
   //put to commitment
   const changeStatus = async (status) => {
     //Put request that change the status of commitment
+    dispatch({ type: actions.updateStatusCommitment });
     try {
-      const url = `/commitments/${commitment.id}/${status}`;
-      const response = await api.put(
-        url,
-        {},
-        {
-          headers: { Authorization: token },
-        }
-      );
-      setCommitment({ ...commitment, status });
+      const url = `/commitments/${state.commitment.id}/${status}`;
+      const response = await api.put(url);
+      dispatch({
+        type: actions.updateStatusCommitmentSuccess,
+        payload: !state.reload,
+      });
     } catch (e) {
-      console.log(e);
+      dispatch({
+        type: actions.updateStatusCommitmentError,
+        payload: "Ocurrio un error",
+      });
     }
-    setDropdownStatus(null);
   };
 
   //functions add collaborator
-  const handleAddColaborator = () => {
-    setAddColaborator(true);
+  const handleWrapperAddColaborator = () => {
+    dispatch({
+      type: actions.wrapperAddCollaboratorOnOff,
+      payload: !state.wrapperAddCollaborator,
+    });
   };
 
-  const [openCreateTask, setOpenCreateTask] = useState(false);
+  //Behavior of tasks
 
-  //functions to open, close, add Task
-
-  const ClickOpenModalCreateTask = () => {
-    setOpenCreateTask(true);
+  //functions to open, close
+  const showModalAddTask = () => {
+    dispatch({ type: actions.showModalAddTask, payload: !state.showModalTask });
   };
 
-  const closeModalCreateTask = () => {
-    setOpenCreateTask(false);
-  };
-
+  //functions to add task
   const addTask = () => {
-    console.log("add task");
-    ClickOpenModalCreateTask();
+    showModalAddTask();
   };
 
   //function to show details
   const showDetailCommitment = () => {
     history.push({
-      pathname: `/commitment_report/${commitment.id}`,
-      state: { isDetail: true },
+      pathname: `/panel/commitment_report/${state.commitment.id}`,
+      state: { id: state.commitment.id, isDetail: true },
     });
   };
 
   //function to view and edit status
   const handleDropdownStatus = (event) => {
-    setDropdownStatus(event.currentTarget);
+    dispatch({
+      type: actions.dropDownStatusOpen,
+      payload: event.currentTarget,
+    });
   };
 
   const handleCloseDropdownStatus = () => {
-    setDropdownStatus(null);
+    dispatch({ type: actions.dropDownStatusClose });
+  };
+
+  const handleNewColaborator = (item) => {
+    dispatch({ type: actions.setColaborator, payload: item });
+  };
+
+  const renderTasks = () => {
+    if (state.tasksError) {
+      return <Error content={state.tasksError} />;
+    }
+    if (state.tasks.length === 0) {
+      return (
+        <WithoutTasks
+          title="¡Oh! aun no se a levantando una tarea de seguimiento"
+          content="Puedes levantar una nueva tarea si eres un colaborador de este compromiso dando click en el botón de Nueva tarea para empezar a dar seguimiento a este proyecto"
+        />
+      );
+    }
+    return (
+      <TaskList
+        tasks={state.tasks}
+        isCollaborator={matchUser(state.commitment.collaborators)}
+      />
+    );
   };
 
   const renderView = () => {
     return (
       <Fragment>
-        <h1> {commitment.organization} </h1>
+        <h1> {state.commitment.organization} </h1>
         <Wrapper>
           <WrapperTask>
-            <TaskList></TaskList>
+            {state.tasksLoading ? <Spinner /> : renderTasks()}
           </WrapperTask>
           <WrapperOpc>
             <Options>
-              {/*this button (add task) will be hidden if  user_id not match with id collaborator*/}
-              <Button title="Nueva tarea" ico={TaskIco} onClick={addTask} />
+              {/*this button (add task) will be hidden if  user_id not is not assigned how collaborator of commitment*/}
+              {matchUser(state.commitment.collaborators) ? (
+                <Button title="Nueva tarea" ico={TaskIco} onClick={addTask} />
+              ) : null}
+
               <Button
                 title="Detalles"
                 type="secundary"
@@ -187,28 +242,34 @@ const TracingCommitmentDetails = ({ rol }) => {
               <Button
                 aria-controls="simple-menu"
                 aria-haspopup="true"
-                title={dataStatus(commitment.status).value}
+                title={dataStatus(state.commitment.status).value}
                 type="status"
-                color={dataStatus(commitment.status).background}
+                color={dataStatus(state.commitment.status).background}
                 ico={StatusIco}
                 onClick={handleDropdownStatus}
               />
               <Menu
                 id="simple-menu"
-                anchorEl={dropdownStatus}
+                anchorEl={state.dropdownStatus}
                 keepMounted
-                open={Boolean(dropdownStatus)}
+                open={Boolean(state.dropdownStatus)}
                 onClose={handleCloseDropdownStatus}
               >
-                <MenuItems onClick={() => changeStatus("proceso")}>
-                  <CircleStatus color={dataStatus("proceso").background} />
-                  En proceso
+                <MenuItems onClick={() => changeStatus("primer_contacto")}>
+                  <CircleStatus
+                    color={dataStatus("primer_contacto").background}
+                  />
+                  Primer Contacto
+                </MenuItems>
+                <MenuItems onClick={() => changeStatus("articulando")}>
+                  <CircleStatus color={dataStatus("articulando").background} />
+                  Articulando
                 </MenuItems>
                 <MenuItems onClick={() => changeStatus("cumplido")}>
                   <CircleStatus color={dataStatus("cumplido").background} />
                   Cumplido
                 </MenuItems>
-                {rol === "collaborator" ? null : (
+                {rolName() === "collaborator" ? null : (
                   <span>
                     <MenuItems onClick={() => changeStatus("validando")}>
                       <CircleStatus
@@ -216,9 +277,11 @@ const TracingCommitmentDetails = ({ rol }) => {
                       />
                       Por validar
                     </MenuItems>
-                    <MenuItems onClick={() => changeStatus("oculto")}>
-                      <CircleStatus color={dataStatus("oculto").background} />
-                      Oculto
+                    <MenuItems onClick={() => changeStatus("archivado")}>
+                      <CircleStatus
+                        color={dataStatus("archivado").background}
+                      />
+                      Archivado
                     </MenuItems>
                     <MenuItems onClick={() => changeStatus("correcion")}>
                       <CircleStatus
@@ -238,19 +301,18 @@ const TracingCommitmentDetails = ({ rol }) => {
             </Options>
             <WrapperColaborators>
               <CollaboratorCardList
-                collaborators={commitment.collaborators}
-                rolUser="1"
+                collaborators={state.commitment.collaborators}
               />
-              {addColaborator ? (
+              {state.wrapperAddCollaborator ? (
                 <WrapperColaborators>
                   <Autocomplete
                     onChange={(event, newValue) =>
-                      setLikelyCollaborator(newValue)
+                      handleNewColaborator(newValue)
                     }
                     style={{ width: "15em" }}
                     multiple
                     id="tags-standard"
-                    options={listCollaborator}
+                    options={state.listColaborators}
                     getOptionLabel={(option) =>
                       `${option.firstName} ${option.lastName}`
                     }
@@ -264,7 +326,7 @@ const TracingCommitmentDetails = ({ rol }) => {
                     )}
                   />
                   <BtnGroup>
-                    <BtnSecundary onClick={() => setAddColaborator(false)}>
+                    <BtnSecundary onClick={handleWrapperAddColaborator}>
                       Cancelar
                     </BtnSecundary>
                     <BtnSecundary primary onClick={addCollaborator}>
@@ -272,8 +334,8 @@ const TracingCommitmentDetails = ({ rol }) => {
                     </BtnSecundary>
                   </BtnGroup>
                 </WrapperColaborators>
-              ) : rol === "collaborator" ? null : (
-                <BtnAddColaborator onClick={handleAddColaborator}>
+              ) : rolName() === "collaborator" ? null : (
+                <BtnAddColaborator onClick={handleWrapperAddColaborator}>
                   <img src={AddIco} alt="add-ico" style={{ width: "18px" }} />
                   <BtnSecundary primary>Agregar colaborador</BtnSecundary>
                 </BtnAddColaborator>
@@ -286,15 +348,16 @@ const TracingCommitmentDetails = ({ rol }) => {
   };
 
   const renderError = () => {
-    return status.error ? <Error /> : renderView();
+    return state.commitmentError ? <Error /> : renderView();
   };
 
   return (
     <Fragment>
-      {status.spinner ? <Spinner /> : renderError()}
+      {state.commitmentLoading ? <Spinner /> : renderError()}
       <ModalCreateTask
-        openNewTask={openCreateTask}
-        closeModalNewTask={closeModalCreateTask}
+        openNewTask={state.showModalTask}
+        closeModalNewTask={showModalAddTask}
+        isEdit={state.isEditModalTask}
       />
     </Fragment>
   );

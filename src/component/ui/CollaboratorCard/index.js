@@ -1,7 +1,11 @@
-import React, { Fragment, useState, useEffect } from "react";
+import React, { Fragment, useState, useEffect, useContext } from "react";
+import { CommitmentContext } from "../../context/CommitmentContext";
+import { actions } from "../../context/CommitmentContext/actions";
 import AlertModal from "../modals/AlertModal";
 import DeletedIco from "../../../assets/img/delete.svg";
+import AvatarIco from "../../../assets/img/usercard.svg";
 import api from "../../../helpers/api";
+import { rolName } from "../../../helpers";
 import {
   Colaborator,
   ImgCollaborator,
@@ -9,7 +13,8 @@ import {
   BtnDeleteColaborator,
 } from "./styled";
 
-const CollaboratorCard = ({ collaborator, rolUser }) => {
+const CollaboratorCard = ({ collaborator }) => {
+  const { state, dispatch } = useContext(CommitmentContext);
   const [showModal, setShowColModal] = useState(false);
   const [deleted, setDeleted] = useState(false);
   const token = JSON.parse(localStorage.getItem("login_data")).accessToken;
@@ -24,16 +29,23 @@ const CollaboratorCard = ({ collaborator, rolUser }) => {
     //check if deleted is true, this behavior comes from the deleted status that is modified in the modal to deleted
     if (deleted) {
       const deletedCollaborator = async () => {
+        dispatch({ type: actions.deletedCollaborator });
         try {
           const response = await api.delete("/collaborators", {
             data: {
               userId: collaborator.id,
               commitmentId: collaborator.UsersCommitments.commitmentId,
             },
-            headers: { Authorization: token },
+          });
+          dispatch({
+            type: actions.deletedCollaboratorSuccess,
+            payload: !state.reload,
           });
         } catch (e) {
-          console.log(e);
+          dispatch({
+            type: actions.deletedCollaboratorError,
+            payload: "Ocurrio un error",
+          });
         }
       };
       deletedCollaborator();
@@ -43,11 +55,14 @@ const CollaboratorCard = ({ collaborator, rolUser }) => {
   return (
     <Fragment>
       <Colaborator>
-        <ImgCollaborator src={collaborator.image} alt="profile img" />
+        <ImgCollaborator
+          src={collaborator.image ? collaborator.image : AvatarIco}
+          alt="profile img"
+        />
         <NameColaborator>
           {`${collaborator.firstName}  ${collaborator.lastName}`}{" "}
         </NameColaborator>
-        {rolUser === "3" ? null : (
+        {rolName() === "collaborator" ? null : (
           <BtnDeleteColaborator
             src={DeletedIco}
             alt="ico_deleted"
